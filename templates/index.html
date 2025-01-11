@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Gloow - Busque sites diretamente</title>
+    <style>
+        /* Estilos básicos */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #ffffff;
+        }
+        .logo {
+            animation: fadeIn 1.5s ease;
+            margin-bottom: 20px;
+            width: 300px;
+            cursor: pointer;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        .search-ai-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 600px;
+        }
+        .search-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            padding: 5px 10px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+        .search-container input {
+            border: none;
+            outline: none;
+            flex-grow: 1;
+            font-size: 18px;
+            padding: 5px 10px;
+            height: 40px;
+        }
+        .search-container button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .search-container button img {
+            width: 24px;
+            height: 24px;
+        }
+        .search-container button:hover {
+            transform: scale(1.1);
+            transition: 0.2s;
+        }
+        .ai-button {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+        .ai-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+        }
+        .ai-button img {
+            width: 24px;
+            height: 24px;
+            filter: brightness(0) invert(1);
+        }
+        /* Modal */
+        #ai-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+        }
+        #ai-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        #ai-prompt {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            resize: none;
+            box-sizing: border-box;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        #send-ai-btn {
+            background: #06b6d4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            flex: 1;
+        }
+        #close-ai-btn {
+            background: #e5e7eb;
+            color: #374151;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #ai-response {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <img src="{{ url_for('static', filename='gloowlogo.png') }}" alt="Gloow Logo" class="logo">
+
+    <div class="search-ai-container">
+        <div class="search-container">
+            <input type="text" id="search" placeholder="Pesquisar...">
+            <button onclick="search()">
+                <img src="https://img.icons8.com/material-rounded/24/000000/search.png" alt="Search Icon">
+            </button>
+        </div>
+        <button class="ai-button">
+            <img src="https://img.icons8.com/material-rounded/24/000000/artificial-intelligence.png" alt="AI Icon">
+        </button>
+    </div>
+
+    <!-- Modal para interação com a Gloow AI -->
+    <div id="ai-modal">
+        <div class="modal-content">
+            <textarea id="ai-prompt" placeholder="Pergunte algo para a Gloow AI..."></textarea>
+            <div class="modal-buttons">
+                <button id="send-ai-btn">Enviar</button>
+                <button id="close-ai-btn">Fechar</button>
+            </div>
+            <div id="ai-response"></div>
+        </div>
+    </div>
+
+    <script>
+        function search() {
+            const query = document.getElementById('search').value.toLowerCase();
+            window.location.href = `/results?q=${encodeURIComponent(query)}`;
+        }
+
+        async function askAI() {
+            const prompt = document.getElementById('ai-prompt').value;
+            const responseDiv = document.getElementById('ai-response');
+            
+            if (!prompt.trim()) {
+                responseDiv.innerHTML = "Por favor, digite uma pergunta.";
+                return;
+            }
+
+            responseDiv.innerHTML = "Carregando...";
+
+            try {
+                const response = await fetch('/ask-ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                const data = await response.json();
+                if (data.response) {
+                    responseDiv.innerHTML = data.response.replace(/\n/g, '<br>');
+                } else {
+                    responseDiv.innerHTML = data.error || "Não foi possível obter a resposta.";
+                }
+            } catch (error) {
+                responseDiv.innerHTML = "Erro ao se comunicar com o servidor.";
+            }
+        }
+
+        // Event listeners para o modal
+        document.addEventListener('DOMContentLoaded', function() {
+            // Botão de pesquisa
+            document.getElementById('search').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    search();
+                }
+            });
+
+            // Modal da IA
+            document.querySelector('.ai-button').addEventListener('click', () => {
+                document.getElementById('ai-modal').classList.add('active');
+            });
+
+            document.getElementById('close-ai-btn').addEventListener('click', () => {
+                document.getElementById('ai-modal').classList.remove('active');
+            });
+
+            document.getElementById('send-ai-btn').addEventListener('click', askAI);
+        });
+    </script>
+</body>
+</html>
