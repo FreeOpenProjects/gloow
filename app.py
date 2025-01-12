@@ -9,10 +9,10 @@ import os
 logger.add("app.log", rotation="10 MB", retention="10 days", level="DEBUG")
 
 # Configurar a chave de API do SerpAPI
-SERP_API_KEY = "a1751aab417af317d8cc2bb3675a3e82cab86936bcf527762417f30a9d0c01ac"
+SERP_API_KEY = "SERP_API_KEY_HERE"
 
 # Configurar a chave de API da IA
-genai.configure(api_key="AIzaSyAHVFZsajRF9lbSg9orRvK-ZXV2iDoSRA8")
+genai.configure(api_key="GNAI_API_KEY_HERE")
 
 # Configurar o modelo
 model = genai.GenerativeModel('gemini-pro')
