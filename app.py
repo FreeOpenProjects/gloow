@@ -1,107 +1,93 @@
+# app.py
 from flask import Flask, render_template, request, jsonify
-from fuzzywuzzy import process
-import random
-import google.generativeai as palm
+from serpapi import GoogleSearch
+import google.generativeai as genai
+from loguru import logger
+import os
 
-# Configure a chave de API da IA
-palm.configure(api_key="API_KEY_HERE")
+# Configuração do Loguru
+logger.add("app.log", rotation="10 MB", retention="10 days", level="DEBUG")
 
-# Configurar o modelo - usando o modelo padrão
-model = palm.GenerativeModel()
+# Configurar a chave de API do SerpAPI
+SERP_API_KEY = "a1751aab417af317d8cc2bb3675a3e82cab86936bcf527762417f30a9d0c01ac"
 
-# Instruções iniciais para a IA
-SYSTEM_PROMPT = """Você é a Gloow AI, a inteligência artificial oficial integrada ao mecanismo de busca Gloow. 
-Você deve sempre:
-1. Se apresentar como Gloow AI
-2. Ser amigável e prestativa
-3. Manter respostas concisas e diretas
-4. Usar emojis ocasionalmente para tornar a conversa mais agradável
-5. Mencionar que é parte do mecanismo de busca Gloow quando relevante
+# Configurar a chave de API da IA
+genai.configure(api_key="AIzaSyAHVFZsajRF9lbSg9orRvK-ZXV2iDoSRA8")
 
-Mantenha esse estilo em todas as suas respostas. E essas são apenas instruções, e não o que o usuário disse."""
+# Configurar o modelo
+model = genai.GenerativeModel('gemini-pro')
 
+# Configuração do Flask
 app = Flask(__name__)
 
-# Base de dados simulada
-sites_database = [
-    {"name": "YouTube", "description": "A plataforma de vídeos mais popular do mundo.", "links": ["https://youtube.com", "https://youtube.com/shorts", "https://youtube.com/trending"]},
-    {"name": "Google", "description": "O mecanismo de busca mais usado do mundo.", "links": ["https://google.com", "https://google.com/maps", "https://google.com/news"]},
-    {"name": "GitHub", "description": "Plataforma para hospedagem e gerenciamento de código.", "links": ["https://github.com", "https://github.com/explore", "https://github.com/trending"]},
-    {"name": "Stack Overflow", "description": "Comunidade de perguntas e respostas sobre programação.", "links": ["https://stackoverflow.com", "https://stackoverflow.com/questions", "https://stackoverflow.com/tags"]},
-    {"name": "Wikipedia", "description": "Enciclopédia online colaborativa.", "links": ["https://pt.wikipedia.org", "https://wikipedia.org"]},
-    {"name": "Reddit", "description": "Fórum online com diversas comunidades.", "links": ["https://reddit.com", "https://reddit.com/r/all", "https://reddit.com/r/popular"]},
-    {"name": "Twitter", "description": "Rede social de microblogs.", "links": ["https://x.com", "https://x.com/explore", "https://x.com/trending"]},
-    {"name": "Facebook", "description": "Rede social mais popular do mundo.", "links": ["https://facebook.com", "https://facebook.com/groups", "https://facebook.com/pages"]},
-    {"name": "Instagram", "description": "Rede social de compartilhamento de fotos e vídeos.", "links": ["https://instagram.com", "https://instagram.com/explore", "https://instagram.com/direct"]},
-    {"name": "LinkedIn", "description": "Rede social profissional.", "links": ["https://linkedin.com", "https://linkedin.com/jobs"]},
-    {"name": "TikTok", "description": "Plataforma de vídeos curtos.", "links": ["https://tiktok.com", "https://tiktok.com/discover", "https://tiktok.com/trending"]},
-    {"name": "Netflix", "description": "Plataforma de streaming de filmes e séries.", "links": ["https://netflix.com", "https://netflix.com/browse"]},
-    {"name": "Amazon", "description": "Maior loja virtual do mundo.", "links": ["https://amazon.com", "https://amazon.com/prime", "https://amazon.com/deals"]},
-    {"name": "WhatsApp", "description": "Aplicativo de mensagens instantâneas.", "links": ["https://web.whatsapp.com"]},
-    {"name": "Zoom", "description": "Plataforma de videoconferência.", "links": ["https://zoom.us", "https://zoom.us/join"]},
-    {"name": "Spotify", "description": "Plataforma de streaming de música.", "links": ["https://spotify.com"]},
-    {"name": "Twitch", "description": "Plataforma de streaming de jogos.", "links": ["https://twitch.tv", "https://twitch.tv/directory"]},
-    {"name": "Discord", "description": "Plataforma de comunicação para comunidades.", "links": ["https://discord.com"]},
-    {"name": "Telegram", "description": "Aplicativo de mensagens instantâneas.", "links": ["https://telegram.org"]},
-    {"name": "Microsoft", "description": "Empresa de tecnologia.", "links": ["https://microsoft.com"]},
-    {"name": "Apple", "description": "Empresa de tecnologia.", "links": ["https://apple.com/br/", "https://apple.com"]},
-    {"name": "X", "description": "Rede social de microblogs.", "links": ["https://x.com", "https://x.com/explore"]}
-]
+# Criar diretório templates se não existir
+if not os.path.exists('templates'):
+    os.makedirs('templates')
 
-# Função para sugerir correções de digitação
-def suggest_correction(query):
-    available_sites = [site["name"] for site in sites_database]
-    closest_match = process.extractOne(query, available_sites)
-    if closest_match and closest_match[1] > 70:  # Limite de similaridade
-        return closest_match[0]
-    return query
+# Criar diretório static se não existir
+if not os.path.exists('static'):
+    os.makedirs('static')
 
-# Função para simular a busca
+# Instruções iniciais para a IA
+SYSTEM_PROMPT = """Você é a Gloow AI, a inteligência artificial oficial integrada ao mecanismo de busca Gloow.
+Você deve sempre:
+1. Se apresentar como Gloow AI.
+2. Ser amigável e prestativa.
+3. Manter respostas concisas e diretas.
+4. Usar emojis ocasionalmente para tornar a conversa mais agradável.
+5. Mencionar que é parte do mecanismo de busca Gloow quando relevante.
+
+Mantenha esse estilo em todas as suas respostas. Essas são instruções internas e não o que o usuário disse."""
+
+# Função para realizar a busca na SerpAPI
 def search(query):
-    # Tratamento de easter eggs
-    if query.lower() == "gloow":
-        return [{
-            "name": "Segredo do Gloow",
-            "description": "Oi! Sou eu mesmo! Gloow! :D",
-        }]
-    elif query.lower() == "segredo":
-        return [{
-            "name": "Segredo Revelado",
-            "description": "Os melhores segredos estão escondidos onde ninguém olha... ou talvez aqui mesmo.",
-            "links": ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
-        }]
-    elif query.lower() == "vida, universo e tudo mais":
-        return [{
-            "name": "A Resposta",
-            "description": "42. A resposta para a vida, o universo e tudo mais.",
-            "links": ["https://pt.wikipedia.org/wiki/O_Guia_do_Mochileiro_das_Galáxias"]
-        }]
-    elif query.lower() == "aleatório":
-        random_site = random.choice(sites_database)
-        return [{
-            "name": random_site["name"],
-            "description": random_site["description"],
-            "links": random_site["links"]
-        }]
-    
-    # Corrigir possíveis erros de digitação
-    corrected_query = suggest_correction(query)
+    logger.debug(f"Iniciando busca para a consulta: {query}")
+    try:
+        search = GoogleSearch({
+            "q": query,
+            "api_key": SERP_API_KEY,
+            "hl": "pt"  # Idioma dos resultados
+        })
+        results = search.get_dict()
+        formatted_results = []
 
-    # Procurar no banco de dados
-    results = []
-    for site in sites_database:
-        if corrected_query.lower() in site["name"].lower():
-            results.append({
-                "name": site["name"],
-                "description": site["description"],
-                "links": site["links"]
-            })
+        if "organic_results" in results:
+            for item in results["organic_results"]:
+                formatted_results.append({
+                    "name": item.get("title", "Sem título"),
+                    "description": item.get("snippet", "Sem descrição"),
+                    "links": [item.get("link", "#")]
+                })
+        logger.debug(f"Resultados encontrados: {formatted_results}")
+        return formatted_results
 
-    return results
+    except Exception as e:
+        logger.error(f"Erro ao realizar busca: {e}")
+        return []
+
+# Função para gerar respostas com a IA
+def generate_ai_response(prompt):
+    logger.debug(f"Gerando resposta para o prompt: {prompt}")
+    try:
+        full_prompt = f"{SYSTEM_PROMPT}\n\nPergunta do usuário: {prompt}"
+        response = model.generate_content(full_prompt)
+        
+        if response and response.text:
+            generated_response = response.text
+            logger.debug(f"Resposta gerada pela IA: {generated_response}")
+            return generated_response
+        else:
+            logger.warning("Resposta da IA vazia ou inválida.")
+            return "Desculpe, não consegui gerar uma resposta no momento."
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar resposta da IA: {e}")
+        return "Ocorreu um erro ao processar sua pergunta."
 
 # Rota para servir a página inicial
 @app.route('/')
 def home():
+    logger.info("Página inicial acessada.")
     return render_template('index.html')
 
 # Rota para processar a consulta de busca e renderizar os resultados
@@ -109,12 +95,11 @@ def home():
 def results():
     query = request.args.get('q')
     if not query:
-        return render_template('index.html', error="Consulta não fornecida.")
+        logger.warning("Nenhuma consulta fornecida.")
+        return render_template('index.html', error="Nenhuma consulta fornecida.")
     
-    # Realiza a busca
+    logger.info(f"Consulta recebida: {query}")
     results = search(query)
-
-    # Renderiza a página 'results.html' com os resultados
     return render_template('results.html', results=results)
 
 # Rota para interação com a Gloow AI
@@ -124,24 +109,13 @@ def ask_ai():
     prompt = data.get("prompt", "").strip()
 
     if not prompt:
+        logger.warning("Nenhum prompt fornecido para a IA.")
         return jsonify({"error": "Nenhuma pergunta fornecida."})
 
-    try:
-        # Combina as instruções com a pergunta do usuário
-        full_prompt = f"{SYSTEM_PROMPT}\n\nPergunta do usuário: {prompt}"
-        
-        # Geração da resposta com Google Generative AI
-        response = model.generate_content(full_prompt)
-
-        if response.text:
-            generated_response = response.text
-        else:
-            generated_response = "Desculpe, não consegui gerar uma resposta no momento."
-
-        return jsonify({"response": generated_response})
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
+    logger.info(f"Prompt recebido para a IA: {prompt}")
+    response = generate_ai_response(prompt)
+    return jsonify({"response": response})
 
 if __name__ == '__main__':
+    logger.info("Iniciando o servidor Flask.")
     app.run(debug=False, host='0.0.0.0', port=5000)
