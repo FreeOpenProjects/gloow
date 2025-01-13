@@ -12,7 +12,7 @@ Gloow é um mecanismo de busca totalmente privado que respeita a privacidade dos
 
 1. Clone este repositório:
    ```bash
-   git clone https://github.com/FreeOpenProjects/gloow.git
+   git clone https://github.com/StreamStudio1/gloow.git
    ```
 2. Navegue até o diretório do projeto:
    ```bash
